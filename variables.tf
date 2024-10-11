@@ -31,10 +31,10 @@ variable "create_resource_group" {
   description = "Create a new resource group with name `var.resource_group_name`, or just use it as resource group's name. Default to `true`. Changing this forces a new resource to be created."
 }
 
-variable "db_edition" {
+variable "db_sku_name" {
   type        = string
   default     = "Basic"
-  description = "The edition of the database to be created."
+  description = "Specifies the name of the SKU used by the database. Changing this from the HyperScale service tier to another service tier will create a new resource."
 }
 
 variable "end_ip_address" {
@@ -55,25 +55,19 @@ variable "server_version" {
   description = "The version for the database server. Valid values are: 2.0 (for v11 server) and 12.0 (for v12 server)."
 }
 
-variable "service_objective_name" {
-  type        = string
-  default     = "Basic"
-  description = "The performance level for the database. For the list of acceptable values, see https://docs.microsoft.com/en-gb/azure/sql-database/sql-database-service-tiers. Default is Basic."
-}
-
 variable "sql_aad_administrator" {
   type = object({
-    login                       = string
+    login_username              = string
     object_id                   = string
-    tenant_id                   = string
+    tenant_id                   = optional(string)
     azuread_authentication_only = optional(bool)
   })
   default     = null
   description = <<-EOF
   object({
-    login = (Required) The login name of the principal to set as the server administrator
+    login_username = (Required) The login name of the principal to set as the server administrator
     object_id = (Required) The ID of the principal to set as the server administrator
-    tenant_id = (Required) The Azure Tenant ID
+    tenant_id = (Optional) The Azure Tenant ID
     azuread_authentication_only = (Optional) Specifies whether only AD Users and administrators can be used to login (`true`) or also local database users (`false`).
   })
 EOF

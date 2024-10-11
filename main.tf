@@ -22,17 +22,15 @@ resource "azurerm_resource_group" "rg" {
 
 locals {
   resource_group_name = try(azurerm_resource_group.rg[0].name, var.resource_group_name)
+  azuread_authentication_only = try(var.sql_aad_administrator.azuread_authentication_only, false)
 }
 
-resource "azurerm_sql_database" "db" {
-  location                         = var.location
-  name                             = var.db_name
-  resource_group_name              = local.resource_group_name
-  server_name                      = azurerm_sql_server.server.name
-  collation                        = var.collation
-  create_mode                      = "Default"
-  edition                          = var.db_edition
-  requested_service_objective_name = var.service_objective_name
+resource "azurerm_mssql_database" "db" {
+  name        = var.db_name
+  server_id   = azurerm_mssql_server.server.id
+  collation   = var.collation
+  create_mode = "Default"
+  sku_name    = var.db_sku_name
   tags = merge(var.tags, (/*<box>*/ (var.tracing_tags_enabled ? { for k, v in /*</box>*/ {
     avm_git_commit           = "2763e5639b42d96382eb4e372bef3a0475128aba"
     avm_git_file             = "main.tf"
@@ -45,13 +43,14 @@ resource "azurerm_sql_database" "db" {
   } /*<box>*/ : replace(k, "avm_", var.tracing_tags_prefix) => v } : {}) /*</box>*/))
 }
 
-resource "azurerm_sql_server" "server" {
+resource "azurerm_mssql_server" "server" {
   #checkov:skip=CKV2_AZURE_2:We don't change tf config for now
   #checkov:skip=CKV_AZURE_24:We don't change tf config for now
   #checkov:skip=CKV_AZURE_23:We don't change tf config for now
   #checkov:skip=CKV2_AZURE_6:We don't change tf config for now
-  administrator_login          = var.sql_admin_username
-  administrator_login_password = var.sql_password
+  administrator_login          = local.azuread_authentication_only ? null : var.sql_admin_username
+  administrator_login_password = local.azuread_authentication_only ? null : var.sql_password
+  azuread_administrator        = var.sql_aad_administrator
   location                     = var.location
   name                         = "${var.db_name}-sqlsvr"
   resource_group_name          = local.resource_group_name
@@ -68,22 +67,10 @@ resource "azurerm_sql_server" "server" {
   } /*<box>*/ : replace(k, "avm_", var.tracing_tags_prefix) => v } : {}) /*</box>*/))
 }
 
-resource "azurerm_sql_firewall_rule" "fw" {
+resource "azurerm_mssql_firewall_rule" "fw" {
   #checkov:skip=CKV_AZURE_11:We don't change tf config for now
-  end_ip_address      = var.end_ip_address
-  name                = "${var.db_name}-fwrules"
-  resource_group_name = local.resource_group_name
-  server_name         = azurerm_sql_server.server.name
-  start_ip_address    = var.start_ip_address
-}
-
-resource "azurerm_sql_active_directory_administrator" "aad_admin" {
-  count = var.sql_aad_administrator == null ? 0 : 1
-
-  login                       = var.sql_aad_administrator.login
-  object_id                   = var.sql_aad_administrator.object_id
-  resource_group_name         = local.resource_group_name
-  server_name                 = azurerm_sql_server.server.name
-  tenant_id                   = var.sql_aad_administrator.tenant_id
-  azuread_authentication_only = var.sql_aad_administrator.azuread_authentication_only
+  end_ip_address   = var.end_ip_address
+  name             = "${var.db_name}-fwrules"
+  server_id        = azurerm_mssql_server.server.id
+  start_ip_address = var.start_ip_address
 }
